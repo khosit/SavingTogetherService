@@ -99,7 +99,13 @@ public class DailyRecordService(AppDbContext db) : IDailyRecordService
         var yesterday = DateTime.Parse(date).AddDays(-1).ToString("yyyy-MM-dd");
         var ydRecord  = await LoadRecordAsync(userKey, yesterday);
         decimal carry = 0;
-        if (ydRecord is not null)
+
+        if(DateTime.Parse(date).Day == 1)
+        {
+            // Reset carry-over at the start of a new month
+            carry = 0;
+        }
+        else if (ydRecord is not null)
         {
             var ydSpent = ydRecord.Expenses.Sum(e => e.Amount);
             carry = ydRecord.AvailableBudget - ydSpent;
