@@ -74,6 +74,10 @@ public static class SeedData
             {
                 var date       = today.AddDays(dayOffset);
                 var dateStr    = date.ToString("yyyy-MM-dd");
+                // Do not carry a surplus/deficit into a new month.
+                if (date.Day == 1)
+                    carry = 0m;
+
                 var available  = user.DailyBudget + carry;
 
                 var record = new DailyRecord

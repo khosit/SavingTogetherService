@@ -17,8 +17,9 @@ public class DailyRecordService(AppDbContext db) : IDailyRecordService
 
     public async Task<DailyRecordResponse?> GetRecordByDateAsync(string userKey, string date)
     {
-        var record = await LoadRecordAsync(userKey, date);
-        return record is null ? null : MapToResponse(record);
+        // Use the same path as daily record creation so an existing first-day
+        // record is normalized to zero carry-over when necessary.
+        return await GetOrCreateRecordAsync(userKey, date);
     }
 
     public async Task<IEnumerable<DailyRecordResponse>> GetMonthRecordsAsync(string userKey, int year, int month)
@@ -90,7 +91,22 @@ public class DailyRecordService(AppDbContext db) : IDailyRecordService
     internal async Task<DailyRecordResponse?> GetOrCreateRecordAsync(string userKey, string date)
     {
         var existing = await LoadRecordAsync(userKey, date);
-        if (existing is not null) return MapToResponse(existing);
+        if (existing is not null)
+        {
+            // A first-of-month record must never inherit the previous month's
+            // surplus/deficit. Normalize existing records as well as newly
+            // created ones, since records may have been seeded or created
+            // before the month-boundary reset rule was applied.
+            if (DateTime.Parse(date).Day == 1 &&
+                (existing.CarryOver != 0 || existing.AvailableBudget != existing.BaseBudget))
+            {
+                existing.CarryOver = 0;
+                existing.AvailableBudget = existing.BaseBudget;
+                await db.SaveChangesAsync();
+            }
+
+            return MapToResponse(existing);
+        }
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.UserKey == userKey);
         if (user is null) return null;
